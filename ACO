@@ -51,15 +51,12 @@ class ACO:
             pheromone = 1/(1+self.final_score(bestAnt)-self.final_score(bestCurrentM))
 
             try:
-
-                print("BEST CURRENT M")
                 size=len(bestCurrentM)
-                # update na wszystkich wezlach ktore pojawily sie w najlepszym matchingu
+                # adding more pheromone egde between every node in currenty best matching
                 for i in range(0, size-1):
                     for j in range(1, size):
                         ACO.constrGraph1[str(bestCurrentM[i])][str(bestCurrentM[j])]['weight'] = ACO.constrGraph1[str(bestCurrentM[i])][str(bestCurrentM[j])]['weight'] + pheromone
                 print(bestCurrentM)
-
 
                 #ACO.constrGraph1[bestCurrentM[0]][bestCurrentM[1]]['weight'] = ACO.constrGraph1[bestCurrentM[0]][bestCurrentM[1]]['weight'] + pheromone
                 pass
@@ -107,7 +104,7 @@ class ACO:
         print("BEST MATCHING score {} {}".format(best_matching_score, self.final_score(best_matching)))
 
     def stop_condition(self):
-        #TO DO 
+        #TO DO
         return False
 
     def final_score(self, m, ro=0.01):
@@ -120,7 +117,6 @@ class ACO:
 class ANT(ACO):
 
     def __init__(self, constrGraph, G1, G2, alpha, beta):
-        #self.constrGraph=constGraph
         self.allowed = self.candidate(G1, G2)
         self.visited = [] #list of tuples
         self.visited_Graph=nx.Graph()
@@ -159,25 +155,20 @@ class ANT(ACO):
         self.visited.append(next)
         self.visited_Graph.add_node(str(next))
 
-        #removes used candidate (maybe remove the impossible ones to?)
+        #removes used candidate (maybe add removing the impossible ones to?)
         for cand in self.allowed:
             if cand==next:
                 self.allowed.remove(cand)
 
         self.ANTscore=super().final_score(self.visited)
         self.current_cost=super().score(next)
-        #if(self.current):
-            #self.constrGraph.add_egde([self.current, next], weight = self.score(next))
 
     def prob(self, cand):
-        # chyba dobrze, liczy prawdopodobienstwo dla pojedynczego kandydata
         pher=0
-        print('odwiedzone')
-        print(self.visited)
         n=len(self.visited)
         if self.visited:
             for i in range(0,n):
-                edges=ACO.constrGraph1.edges()
+                #edges=ACO.constrGraph1.edges()
                 try:
                     temp = ACO.constrGraph1[str(self.visited[i])][str(cand)]['weigth']
                 except:
@@ -196,7 +187,6 @@ class ANT(ACO):
         self.pheromone_cand = self.pheromone_cand + pher
 
         h=self.score(cand)
-        # tutaj jest inaczej niz w dokumentach, jak jest mnozenie, bo nie znajduje nic
         prob=pow(pher, self.alpha)*pow(h, self.beta)
         print('prawdopodobienstwo {}'.format(prob))
         return prob
@@ -207,9 +197,7 @@ class ANT(ACO):
         final_score=self.final_score(self.visited)
         n=0
         while(n<4):
-            print("NOWA ITERACJA")
             self.add_matching()
-            print("Matching {}: ".format(self.visited))
             self.ANTscore=self.final_score(self.visited)
             print(self.ANTscore)
             n=n+1
