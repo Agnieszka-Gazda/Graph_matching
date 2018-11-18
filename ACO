@@ -1,0 +1,259 @@
+import networkx as nx
+import matplotlib.pyplot as plt
+import random
+
+class ACO:
+
+    constrGraph1=nx.Graph()
+
+    def __init__(self, G1, G2, ant_count=2, generations=6, alpha=0.1, beta=0.1, rho=0.01, q=1):
+        self.Q = q
+        self.rho = rho
+        self.beta = beta
+        self.alpha = alpha
+        self.ant_count = ant_count
+        self.generations = generations
+        self.G1=G1
+        self.G2=G2
+
+    def initate_constrGraph(self, G1, G2):
+        G1_list=count_parameters(G1)
+        G2_list=count_parameters(G2)
+
+        allowed = []
+        for i in G1_list:
+            for j in G2_list:
+                allowed.append((i, j))
+
+        for i in allowed:
+            ACO.constrGraph1.add_node(str(i))
+
+        for node1 in ACO.constrGraph1.nodes:
+            for node2 in ACO.constrGraph1.nodes:
+                ACO.constrGraph1.add_edge(node1, node2, weigth=1)
+
+
+    def update_pheromone(self, bestAnt, bestCurrentM):
+        '''
+        chyba dobrze, nie jestem pewna zy tak sie dodaje feromony
+        '''
+        print("UPDATE PHERONOME")
+        print(ACO.constrGraph1.nodes())
+        # decrease the level of pheromone
+        for edg in ACO.constrGraph1.edges():
+            edg1 = edg[0]
+            edg2 = edg[1]
+            try:
+                ACO.constrGraph1[edg1][edg2]['weight'] = ACO.constrGraph1[edg1][edg2]['weight'] *(1 - self.Q)
+            except:
+                ACO.constrGraph1[edg1][edg2]['weight']=1
+
+            pheromone = 1/(1+self.final_score(bestAnt)-self.final_score(bestCurrentM))
+
+            try:
+
+                print("BEST CURRENT M")
+                size=len(bestCurrentM)
+                # update na wszystkich wezlach ktore pojawily sie w najlepszym matchingu
+                for i in range(0, size-1):
+                    for j in range(1, size):
+                        ACO.constrGraph1[str(bestCurrentM[i])][str(bestCurrentM[j])]['weight'] = ACO.constrGraph1[str(bestCurrentM[i])][str(bestCurrentM[j])]['weight'] + pheromone
+                print(bestCurrentM)
+
+
+                #ACO.constrGraph1[bestCurrentM[0]][bestCurrentM[1]]['weight'] = ACO.constrGraph1[bestCurrentM[0]][bestCurrentM[1]]['weight'] + pheromone
+                pass
+            except:
+                ACO.constrGraph1[bestCurrentM[0]][bestCurrentM[1]]['weight']=pheromone
+
+
+    def score(self, matching, ro = 0.01):
+        inv = abs(matching[0][1] * matching[0][2] * matching[0][3] - matching[1][1] * matching[1][2] * matching[1][3])
+        score = 1 / (inv + ro)
+        return score
+
+    def ACO_algo(self):
+        self.initate_constrGraph(self.G1, self.G2)
+        best_matching=[]
+        best_matching_score=0
+        best_current=[]
+        best_current_score=0
+        n=0
+
+        #creating ants
+        ants=[]
+        for i in range(0, self.ant_count):
+            A=ANT(ACO.constrGraph1, self.G1, self.G2, self.alpha, self.beta)
+            ants.append(A)
+
+        #next step of all of the ants and updating the pheromone trail
+        for n in range(0, self.generations):
+            if not self.stop_condition():
+                for A in ants:
+                    A.add_matching()
+                    Ascore=self.final_score(A.visited)
+                    if Ascore>best_current_score:
+                        best_current_score=Ascore
+                        best_current=A.visited
+
+                    if Ascore>best_matching_score:
+                        best_matching_score=Ascore
+                        best_matching=A.visited
+            n=n+1
+            print(n)
+
+            self.update_pheromone(best_current, best_matching)
+        print(best_matching)
+        print("BEST MATCHING score {} {}".format(best_matching_score, self.final_score(best_matching)))
+
+    def stop_condition(self):
+        #TO DO 
+        return False
+
+    def final_score(self, m, ro=0.01):
+        inv=0
+        for matching in m:
+            inv = inv+ abs(matching[0][1] * matching[0][2] * matching[0][3] - matching[1][1] * matching[1][2] * matching[1][3])
+        return(1/(inv+ro))
+
+
+class ANT(ACO):
+
+    def __init__(self, constrGraph, G1, G2, alpha, beta):
+        #self.constrGraph=constGraph
+        self.allowed = self.candidate(G1, G2)
+        self.visited = [] #list of tuples
+        self.visited_Graph=nx.Graph()
+        self.pheromone_cand=0;
+        self.current=[]
+        self.current_cost=0
+        self.ANTscore=0;
+        self.alpha=alpha
+        self.beta=beta
+
+    def candidate(self, G1, G2):
+        G1_list=count_parameters(G1)
+        G2_list=count_parameters(G2)
+
+        allowed = []
+        for i in G1_list:
+            for j in G2_list:
+                allowed.append((i, j))
+
+        return allowed
+
+    def add_matching(self):
+
+        next=self.allowed[0]
+        prob_next=self.prob(next)
+        for cand in self.allowed:
+            print('KANDYDAT')
+            print(cand)
+            temp=self.prob(cand)
+            if temp>prob_next:
+                next=cand
+                prob_next=temp
+
+        print("Next str:{}".format(str(next)))
+        ACO.constrGraph1.add_node(str(next))
+        self.visited.append(next)
+        self.visited_Graph.add_node(str(next))
+
+        #removes used candidate (maybe remove the impossible ones to?)
+        for cand in self.allowed:
+            if cand==next:
+                self.allowed.remove(cand)
+
+        self.ANTscore=super().final_score(self.visited)
+        self.current_cost=super().score(next)
+        #if(self.current):
+            #self.constrGraph.add_egde([self.current, next], weight = self.score(next))
+
+    def prob(self, cand):
+        # chyba dobrze, liczy prawdopodobienstwo dla pojedynczego kandydata
+        pher=0
+        print('odwiedzone')
+        print(self.visited)
+        n=len(self.visited)
+        if self.visited:
+            for i in range(0,n):
+                edges=ACO.constrGraph1.edges()
+                try:
+                    temp = ACO.constrGraph1[str(self.visited[i])][str(cand)]['weigth']
+                except:
+                    temp=0
+                    ACO.constrGraph1.add_edge(str(self.visited[i]), str(cand), weigth=1)
+
+                print('pher do doadanie {}'.format(temp))
+                pher=pher+temp
+                #print("edge przed doadaniem")
+                #print(edges)
+                #print(self.visited[i])
+                #print(cand)
+                #print("EDGE:")
+                print(ACO.constrGraph1.edges)
+
+        self.pheromone_cand = self.pheromone_cand + pher
+
+        h=self.score(cand)
+        # tutaj jest inaczej niz w dokumentach, jak jest mnozenie, bo nie znajduje nic
+        prob=pow(pher, self.alpha)*pow(h, self.beta)
+        print('prawdopodobienstwo {}'.format(prob))
+        return prob
+
+    #tutaj byly score i final_score takie jak w ACO, ale chyba niepotrzebne i zostaly usuniete
+    '''
+    def single_ANT(self):
+        final_score=self.final_score(self.visited)
+        n=0
+        while(n<4):
+            print("NOWA ITERACJA")
+            self.add_matching()
+            print("Matching {}: ".format(self.visited))
+            self.ANTscore=self.final_score(self.visited)
+            print(self.ANTscore)
+            n=n+1
+
+        return self.visited
+
+        #plt.subplot(121)
+        #nx.draw(self.visited_Graph, with_labels=True)
+        #plt.show()
+    '''
+
+def count_parameters(G):
+    '''
+    :param G: graph
+    :param graph_parameters:
+    :return: mmatrix with parameters to count fittness function
+    [node, degree, sum of shortest paths, eccentrity (max shortest path)]
+    '''
+    graph_parameters = []
+    N = nx.number_of_nodes(G)
+    #print(N)
+    nodes = nx.nodes(G)
+    for i in nodes:
+        deg = nx.degree(G,i)
+        # if Sp=0, then the SP doesn't exist
+        SP = nx.single_source_shortest_path_length(G, i)
+        sum_SP = 0
+        Ecc = 0
+        for j in SP:
+            if SP[j] > Ecc:
+                Ecc = SP[j]
+            sum_SP = sum_SP + SP[j]
+        param = [i, deg, sum_SP, Ecc]
+        graph_parameters.append(param)
+
+    return graph_parameters
+
+G = nx.Graph()
+G.add_nodes_from([1, 2, 3, 4, 5, 6, 7])
+G.add_edges_from([(1, 2), (1, 3), (1, 4), (4, 3), (4, 2), (2, 5), (4, 5), (1, 6), (7, 6)])
+
+G2 = nx.Graph()
+G2.add_nodes_from([1, 2, 3, 4, 5, 6, 7])
+G2.add_edges_from([(1, 2), (1, 3), (1, 4), (4, 3), (4, 2), (2, 5), (4, 5), (1, 6), (7, 6)])
+constGraph=nx.Graph()
+A=ACO(G, G2)
+A.ACO_algo()
