@@ -1,4 +1,6 @@
 import networkx as nx
+import numpy as np
+import copy
 import matplotlib.pyplot as plt
 import random
 
@@ -6,7 +8,7 @@ class ACO:
 
     constrGraph1=nx.Graph()
 
-    def __init__(self, G1, G2, ant_count=2, generations=6, alpha=0.1, beta=0.1, rho=0.01, q=1):
+    def __init__(self, G1, G2, ant_count=2, generations=60, alpha=0.5, beta=1, rho=0.01, q=1):
         self.Q = q
         self.rho = rho
         self.beta = beta
@@ -34,11 +36,7 @@ class ACO:
 
 
     def update_pheromone(self, bestAnt, bestCurrentM):
-        '''
-        chyba dobrze, nie jestem pewna zy tak sie dodaje feromony
-        '''
-        print("UPDATE PHERONOME")
-        print(ACO.constrGraph1.nodes())
+
         # decrease the level of pheromone
         for edg in ACO.constrGraph1.edges():
             edg1 = edg[0]
@@ -56,9 +54,7 @@ class ACO:
                 for i in range(0, size-1):
                     for j in range(1, size):
                         ACO.constrGraph1[str(bestCurrentM[i])][str(bestCurrentM[j])]['weight'] = ACO.constrGraph1[str(bestCurrentM[i])][str(bestCurrentM[j])]['weight'] + pheromone
-                print(bestCurrentM)
 
-                #ACO.constrGraph1[bestCurrentM[0]][bestCurrentM[1]]['weight'] = ACO.constrGraph1[bestCurrentM[0]][bestCurrentM[1]]['weight'] + pheromone
                 pass
             except:
                 ACO.constrGraph1[bestCurrentM[0]][bestCurrentM[1]]['weight']=pheromone
@@ -85,27 +81,45 @@ class ACO:
 
         #next step of all of the ants and updating the pheromone trail
         for n in range(0, self.generations):
-            if not self.stop_condition():
+            if not self.stop_condition(best_matching):
                 for A in ants:
                     A.add_matching()
                     Ascore=self.final_score(A.visited)
-                    if Ascore>best_current_score:
-                        best_current_score=Ascore
-                        best_current=A.visited
 
-                    if Ascore>best_matching_score:
-                        best_matching_score=Ascore
-                        best_matching=A.visited
-            n=n+1
-            print(n)
+                    if Ascore>=best_current_score:
+                        best_current_score=copy.deepcopy(Ascore)
+                        best_current=copy.deepcopy(A.visited)
 
-            self.update_pheromone(best_current, best_matching)
+                    if Ascore>=best_matching_score:
+                        best_matching_score=copy.deepcopy(Ascore)
+                        best_matching=copy.deepcopy(A.visited)
+                        print(Ascore)
+                        print(best_matching_score)
+                n=n+1
+                print(n)
+
+                self.update_pheromone(best_current, best_matching)
+                print(best_matching)
+                print("BEST MATCHING score {} {}".format(best_matching_score, self.final_score(best_matching)))
+
         print(best_matching)
         print("BEST MATCHING score {} {}".format(best_matching_score, self.final_score(best_matching)))
 
-    def stop_condition(self):
-        #TO DO
-        return False
+    def stop_condition(self, bestmatching):
+
+        G1nodes = self.G1.nodes
+        for node in G1nodes:
+            flag=0
+            for i in bestmatching:
+                if i[0][0]==node:
+                    flag=1
+
+            if flag==0:
+                print(False)
+                return False
+        return True
+
+
 
     def final_score(self, m, ro=0.01):
         inv=0
@@ -118,7 +132,7 @@ class ANT(ACO):
 
     def __init__(self, constrGraph, G1, G2, alpha, beta):
         self.allowed = self.candidate(G1, G2)
-        self.visited = [] #list of tuples
+        self.visited = []
         self.visited_Graph=nx.Graph()
         self.pheromone_cand=0;
         self.current=[]
@@ -139,18 +153,33 @@ class ANT(ACO):
         return allowed
 
     def add_matching(self):
-
+        '''
         next=self.allowed[0]
         prob_next=self.prob(next)
         for cand in self.allowed:
-            print('KANDYDAT')
-            print(cand)
+
             temp=self.prob(cand)
             if temp>prob_next:
                 next=cand
                 prob_next=temp
+        '''
+        #choice of the next matching
+        sum=0
+        cand_prob=[]
 
-        print("Next str:{}".format(str(next)))
+        for cand in self.allowed:
+            sum=sum+self.prob(cand)
+            cand_prob.append(self.prob(cand))
+        size=len(self.allowed)
+
+        for i in range(0, size):
+            cand_prob[i]=cand_prob[i]/sum
+
+        cands=list(range(0, size))
+        next=np.random.choice(cands, 1, p=cand_prob)
+        next=self.allowed[next[0]]
+
+        #print("Next str:{}".format(str(next)))
         ACO.constrGraph1.add_node(str(next))
         self.visited.append(next)
         self.visited_Graph.add_node(str(next))
@@ -163,32 +192,49 @@ class ANT(ACO):
         self.ANTscore=super().final_score(self.visited)
         self.current_cost=super().score(next)
 
+    def temp(self):
+
+        sum=0
+        print(self.allowed)
+        cand_prob=[]
+        for cand in self.allowed:
+            sum=sum+self.prob(cand)
+            cand_prob.append(self.prob(cand))
+        size=len(self.allowed)
+        print(len(cand_prob))
+
+        print(sum)
+        for i in range(0, size):
+            if sum==0:
+                cand_prob[i]=1/size
+            else:
+                cand_prob[i]=cand_prob[i]/sum
+
+        cand=list(range(0, size))
+        next=np.random.choice(cand, 1, p=cand_prob)
+        print(next)
+
     def prob(self, cand):
         pher=0
+        self.pheromone_cand=0
         n=len(self.visited)
         if self.visited:
             for i in range(0,n):
-                #edges=ACO.constrGraph1.edges()
                 try:
                     temp = ACO.constrGraph1[str(self.visited[i])][str(cand)]['weigth']
                 except:
                     temp=0
                     ACO.constrGraph1.add_edge(str(self.visited[i]), str(cand), weigth=1)
 
-                print('pher do doadanie {}'.format(temp))
                 pher=pher+temp
-                #print("edge przed doadaniem")
-                #print(edges)
-                #print(self.visited[i])
-                #print(cand)
-                #print("EDGE:")
-                print(ACO.constrGraph1.edges)
+        else:
+            pher=1
 
         self.pheromone_cand = self.pheromone_cand + pher
 
         h=self.score(cand)
+        #print(self.pheromone_cand, h)
         prob=pow(pher, self.alpha)*pow(h, self.beta)
-        print('prawdopodobienstwo {}'.format(prob))
         return prob
 
     #tutaj byly score i final_score takie jak w ACO, ale chyba niepotrzebne i zostaly usuniete
@@ -218,7 +264,6 @@ def count_parameters(G):
     '''
     graph_parameters = []
     N = nx.number_of_nodes(G)
-    #print(N)
     nodes = nx.nodes(G)
     for i in nodes:
         deg = nx.degree(G,i)
@@ -245,3 +290,6 @@ G2.add_edges_from([(1, 2), (1, 3), (1, 4), (4, 3), (4, 2), (2, 5), (4, 5), (1, 6
 constGraph=nx.Graph()
 A=ACO(G, G2)
 A.ACO_algo()
+
+
+
